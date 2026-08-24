@@ -337,5 +337,778 @@ window.exportPresentationMerged=async function(opts){window.__ZK_MERGE__=!0;try{
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- ===== مسابقات الوحدة الأولى (مضافة) ===== -->
+    <script>
+/* ==========================================================================
+   ألعاب الوحدة الأولى (الزكاة) — وحدة مستقلة تعمل بدون إنترنت
+   تُحقن داخل المنصة كطبقة منفصلة (Shadow DOM) فلا تتعارض مع تنسيقاتها
+   ========================================================================== */
+(function(){
+  if (window.__zakatGamesLoaded) return;
+  window.__zakatGamesLoaded = true;
+
+  /* ---------------- بنوك المحتوى (مستخرجة من نص الحقيبة) ---------------- */
+  const RATE_OPTIONS = ['٢٫٥٪ ربع العشر','٥٪ نصف العشر','١٠٪ العشر','٢٠٪ الخُمس','لا زكاة'];
+
+  const RATE_ITEMS = [
+    {t:'مبلغ نقدي في حساب جارٍ بلغ النصاب وحال عليه الحول', a:0, w:'الثروة النقدية فيها ربع العشر ٢٫٥٪ إذا بلغت النصاب وحال عليها الحول.'},
+    {t:'سبائك ذهب بلغت النصاب وحال عليها الحول', a:0, w:'السبائك والجنيهات تُضم إلى الثروة النقدية وفيها ربع العشر ٢٫٥٪.'},
+    {t:'بضاعة معروضة للبيع في متجر (عروض تجارة)', a:0, w:'عروض التجارة تُقوَّم بسعر السوق يوم الوجوب وفيها ٢٫٥٪.'},
+    {t:'قمح سُقي بماء المطر والعيون', a:2, w:'«فيما سقت السماء والعيون أو كان عثرياً: العشر» — أي ١٠٪ لأنه بلا كلفة.'},
+    {t:'تمر سُقي بالمضخات وبكلفة على المزارع', a:1, w:'«وما سُقي بالنضح: نصف العشر» — أي ٥٪ لوجود الكلفة.'},
+    {t:'كنز جاهلي عليه علامة كفر وجده رجل في أرضٍ موات', a:3, w:'الركاز يجب فيه الخُمس ٢٠٪، ولا نصاب فيه ولا حول.'},
+    {t:'معدن نحاس استخرجه شخص بنفسه وبلغت قيمته النصاب', a:0, w:'الواجب في زكاة المعادن ربع العشر ٢٫٥٪ بشرط بلوغ نصاب الذهب أو الفضة أيهما أقل.'},
+    {t:'حُليّ ذهب مباح تلبسه امرأة أو تُعيره', a:4, w:'الحلي المباح المعدّ للاستعمال أو العارية لا زكاة فيه.'},
+    {t:'حُليّ ذهب اتُّخذ للتأجير أو للادخار', a:0, w:'إذا خرج الحلي عن الاستعمال إلى الإيجار أو الادخار أو التجارة وجبت فيه الزكاة ٢٫٥٪.'},
+    {t:'أوانٍ من الذهب والفضة يستعملها صاحبها', a:0, w:'الحلي المحرَّم (كالأواني) تجب فيه الزكاة بالإجماع ٢٫٥٪.'},
+    {t:'راتب شهري ادُّخر وبلغ النصاب وحال عليه الحول', a:0, w:'كسب العمل يُشترط فيه الحول وبلوغ النصاب، ومقداره ٢٫٥٪.'},
+    {t:'سيارة يستعملها صاحبها للركوب (من عروض القنية)', a:4, w:'عروض القنية والأصول الثابتة لا تدخل في وعاء الزكاة.'},
+    {t:'الفوائد الربوية الناتجة من حساب توفير', a:4, w:'الفوائد محرمة ولا زكاة عليها، بل يجب التخلص منها، وتُزكّى أصل الوديعة فقط.'},
+    {t:'خضراوات كالخيار والباذنجان والجزر', a:4, w:'لا زكاة في الخضراوات ولا في سائر الفواكه غير المكيلة المدّخرة.'},
+    {t:'أسهم اشتُريت بنية المتاجرة بها', a:0, w:'أسهم المتاجرة تُعامل معاملة عروض التجارة: ٢٫٥٪ من القيمة السوقية.'},
+    {t:'آلات ومعدات المصنع (أصول ثابتة)', a:4, w:'الآلات والأصول الثابتة عروض قنية لا زكاة في عينها.'},
+    {t:'أرض عثرية تشرب بعروقها من غير كلفة، أنتجت ٨٠٠ كجم قمحاً', a:2, w:'العثري ما شرب بعروقه بلا كلفة، ففيه العشر ١٠٪ لبلوغه النصاب (٦١٢ كجم).'}
+  ];
+
+  const BUCKETS = ['الثروة النقدية','عروض التجارة','الثروة الحيوانية','الزروع والثمار','المعادن والركاز','كسب العمل'];
+
+  const CLASSIFY_ITEMS = [
+    {t:'٥٠٠٠٠ ريال في الخزنة', a:0, w:'النقود بجميع عملاتها من الثروة النقدية.'},
+    {t:'سبائك فضة وجنيهات ذهب', a:0, w:'السبائك والجنيهات تُضم إلى الثروة النقدية بقيمتها السوقية.'},
+    {t:'أسهم مشتراة للمتاجرة', a:1, w:'أسهم المضاربة تُقوَّم كعروض التجارة.'},
+    {t:'مستودع ملابس مُعدّ للبيع', a:1, w:'كل ما أُعدّ للبيع فهو من عروض التجارة.'},
+    {t:'أرضٌ اشتُريت بنية بيعها والمتاجرة فيها', a:1, w:'العقار المُعدّ للبيع من عروض التجارة، بخلاف المُعدّ للسكنى.'},
+    {t:'٤٠ من الغنم السائمة ترعى الحول أو أكثره', a:2, w:'السائمة من بهيمة الأنعام تدخل في الثروة الحيوانية.'},
+    {t:'خمس من الإبل السائمة', a:2, w:'نصاب الإبل خمس؛ «ولا في أقل من خمسة ذود صدقة».'},
+    {t:'٧٠٠ كجم من التمر بعد الحصاد', a:3, w:'الزروع والثمار المكيلة المدّخرة، ونصابها ٦١٢ كجم.'},
+    {t:'محصول شعير بلغ خمسة أوسق', a:3, w:'خمسة أوسق = ٣٠٠ صاع = ٦١٢ كجم وهو النصاب.'},
+    {t:'كنز جاهلي عليه رسم صليب', a:4, w:'ما عليه علامة كفر فهو ركاز، وفيه الخُمس.'},
+    {t:'خام نحاس استخرجه شخص من أرضه', a:4, w:'المعادن كل ما له قيمة من جوهر أو فلز، وفيها ربع العشر.'},
+    {t:'راتب مهندس ادّخره حتى حال عليه الحول', a:5, w:'إيراد كسب العمل والمهن الحرة، ويشترط له الحول والنصاب.'},
+    {t:'أجرة طبيب من عيادته الخاصة ادُّخرت سنة', a:5, w:'المهن الحرة من كسب العمل.'}
+  ];
+
+  const TF_ITEMS = [
+    {t:'مال بلغ النصاب لكن لم يمضِ عليه الحول', a:false, w:'مضي الحول شرط، إلا في الزروع والثمار والمعادن والركاز.'},
+    {t:'زرعٌ حُصد اليوم وبلغ النصاب ولم يمضِ عليه حول', a:true, w:'الزروع والثمار لا يشترط لها الحول، بل تجب يوم الحصاد.'},
+    {t:'ركاز وُجد اليوم وقيمته ألف ريال فقط', a:true, w:'الركاز لا نصاب فيه ولا حول، وفيه الخُمس.'},
+    {t:'حُليّ ذهب مباح تلبسه المرأة', a:false, w:'الحلي المباح المعدّ للاستعمال أو العارية لا زكاة فيه.'},
+    {t:'حُليّ ذهب اتُّخذ فراراً من الزكاة', a:true, w:'ما اتُّخذ فراراً من الزكاة لا تسقط عنه الزكاة.'},
+    {t:'مال مغصوب لا يقدر صاحبه على استرداده', a:false, w:'تمام الملك شرط، والمال الذي لا يُقدر على التصرف فيه لا زكاة فيه حال ذلك.'},
+    {t:'أغنام مرباة بكلفة (معلوفة) للتجارة أو اللحم', a:false, w:'زكاة الثروة الحيوانية مشروطة بالسوم؛ فالمعلوفة لا تدخل فيها (وتُزكّى تجارةً إن كانت للبيع).'},
+    {t:'نقود بلغت ما قيمته ٥٩٥غ فضة وحال عليها الحول', a:true, w:'بلغت النصاب مع الحول فتجب فيها ٢٫٥٪.'},
+    {t:'ذهب عيار ٢٤ وزنه ٦٠ غراماً فقط', a:false, w:'نصاب الذهب ٨٥ غراماً، وما دونه لا زكاة فيه.'},
+    {t:'أوانٍ من فضة يستعملها الرجل في بيته', a:true, w:'الحلي المحرَّم تجب فيه الزكاة بالإجماع.'},
+    {t:'خضار وفواكه كالتفاح والخيار مهما كثرت', a:false, w:'لا زكاة في الخضراوات وسائر الفواكه غير المكيلة المدخرة.'},
+    {t:'سيارة الأجرة نفسها التي يعمل عليها صاحبها', a:false, w:'عين السيارة من عروض القنية، وإنما تُزكّى غلتها إن بلغت النصاب وحال عليها الحول.'},
+    {t:'مال مملوك لصبي صغير بلغ النصاب وحال عليه الحول', a:true, w:'الزكاة تتعلق بالمال، وينوي عن الصغير وليّه.'},
+    {t:'مال تلف بعد وجوب الزكاة فيه واستقرار ملكه', a:true, w:'الزكاة تجب في عين المال ولها تعلق بالذمة، فلا يسقطها التلف بعد الوجوب.'},
+    {t:'دَينٌ على المكلف حالٌّ يستغرق ماله كله', a:false, w:'من شروط المال الخلو من الديون؛ فإذا استغرق الدين المال لم يبلغ النصاب.'},
+    {t:'أرض بور لم تُزرع ولم تُعدّ للبيع', a:false, w:'يشترط النماء، والأرض المعطلة ليست مالاً نامياً ولا عرض تجارة.'}
+  ];
+
+  const MASARIF = [
+    {k:'الفقير', v:'من لا يجد الكفاية مطلقاً، أو يجد بعضها دون نصفها'},
+    {k:'المسكين', v:'من يجد أكثر الكفاية أو نصفها ولا يكفيه'},
+    {k:'العاملون عليها', v:'السعاة الذين يبعثهم الإمام، ومنهم الجابي والحافظ والكاتب والقاسم — ويُعطون بقدر أجرتهم ولو كانوا أغنياء'},
+    {k:'المؤلفة قلوبهم', v:'السيد المطاع في عشيرته ممن يُرجى إسلامه أو كفّ شره أو إسلام نظيره'},
+    {k:'في الرقاب', v:'المكاتَب المسلم، وشراء الرقيق للإعتاق، ويلحق به الأسير المسلم لفكّ أسره'},
+    {k:'الغارمون', v:'المدين العاجز عن وفاء دينه، ومن تحمّل مالاً لإصلاح ذات البين'},
+    {k:'في سبيل الله', v:'المجاهدون الذين لا رواتب لهم من بيت المال، ويدخل فيه الحج'},
+    {k:'ابن السبيل', v:'المسافر المنقطع عن بلده الذي احتاج في سفره ولو كان غنياً في بلده'}
+  ];
+
+  const CALC_PROBLEMS = [
+    {
+      t:'امرأة لديها ٦٠٠٠٠ ريال نقداً، وذهب للاستعمال المباح قيمته ٣٠٠٠٠ ريال، وسبائك ذهب قيمتها ٨٤٠٥٠ ريال. سعر غرام الفضة يوم الوجوب ٤ ريالات. احسب مقدار الزكاة.',
+      hint:'الحلي المباح المعدّ للاستعمال لا يدخل الوعاء. نصاب الفضة = ٥٩٥ × ٤ = ٢٣٨٠ ريالاً.',
+      ans:3601.25,
+      sol:['الوعاء = ٦٠٠٠٠ + ٨٤٠٥٠ = <b>١٤٤٠٥٠ ريالاً</b> (الحلي المباح للاستعمال يُستبعد).','النصاب = ٥٩٥غ × ٤ = ٢٣٨٠ ريالاً، والوعاء يفوقه فتجب الزكاة.','الزكاة = ١٤٤٠٥٠ × ٢٫٥٪ = <b>٣٦٠١٫٢٥ ريالاً</b> (أو ١٤٤٠٥٠ ÷ ٤٠).']
+    },
+    {
+      t:'تاجر: بضاعة بسعر السوق يوم الوجوب ٣٠٠٠٠٠ ريال، ونقدية بالصندوق ٤٠٠٠٠ ريال، وعليه ديون حالّة ٩٠٠٠٠ ريال، ولديه رفوف ومعدات بـ ٥٠٠٠٠ ريال. احسب الزكاة.',
+      hint:'المعدات عروض قنية لا تدخل الوعاء، والديون الحالّة تُحسم.',
+      ans:6250,
+      sol:['الوعاء = ٣٠٠٠٠٠ + ٤٠٠٠٠ − ٩٠٠٠٠ = <b>٢٥٠٠٠٠ ريال</b>.','المعدات من عروض القنية فلا تدخل.','الزكاة = ٢٥٠٠٠٠ × ٢٫٥٪ = <b>٦٢٥٠ ريالاً</b>.']
+    },
+    {
+      t:'مزارع أنتجت أرضه ٨٠ وسقاً، سعر الوسق ١٠٠ ريال، والسقي من ماء المطر طوال العام. احسب الزكاة.',
+      hint:'النصاب خمسة أوسق، والسقي بلا كلفة.',
+      ans:800,
+      sol:['الوعاء = ٨٠ وسقاً × ١٠٠ = <b>٨٠٠٠ ريال</b>، والنصاب ٥ أوسق فتجب الزكاة.','السقي بلا كلفة ⇐ النسبة العشر ١٠٪.','الزكاة = ٨٠٠٠ × ١٠٪ = <b>٨٠٠ ريال</b>.']
+    },
+    {
+      t:'مزرعة أنتجت ٨٠ وسقاً، سعر الوسق ١٠٠ ريال، والسقي بمضخات وبكلفة يتحملها المزارع. احسب الزكاة.',
+      hint:'السقي بكلفة يخفض النسبة إلى النصف.',
+      ans:400,
+      sol:['الوعاء = <b>٨٠٠٠ ريال</b>.','السقي بكلفة ⇐ نصف العشر ٥٪.','الزكاة = ٨٠٠٠ × ٥٪ = <b>٤٠٠ ريال</b>.']
+    },
+    {
+      t:'رجل وجد ركازاً عليه علامة أهل الجاهلية، قيمته ٦٠٠٠٠ ريال، ولم يمضِ عليه حول. احسب الزكاة.',
+      hint:'لا نصاب في الركاز ولا حول.',
+      ans:12000,
+      sol:['الركاز يجب فيه الخُمس فوراً بمجرد حيازته.','الزكاة = ٦٠٠٠٠ × ٢٠٪ = <b>١٢٠٠٠ ريال</b>.','وتُصرف في مصالح المسلمين ولا تختص بالأصناف الثمانية.']
+    },
+    {
+      t:'موظف ادّخر من راتبه ٣٠٠٠٠ ريال حال عليها الحول، وعليه قسط سيارة حالّ قدره ٥٠٠٠ ريال. احسب الزكاة.',
+      hint:'يُحسم الدين الحالّ ثم تُطبَّق نسبة كسب العمل.',
+      ans:625,
+      sol:['الوعاء = ٣٠٠٠٠ − ٥٠٠٠ = <b>٢٥٠٠٠ ريال</b>، وهو فوق النصاب.','كسب العمل المدّخر تُطبق عليه نسبة ٢٫٥٪ بعد الحول.','الزكاة = ٢٥٠٠٠ × ٢٫٥٪ = <b>٦٢٥ ريالاً</b>.']
+    },
+    {
+      t:'شركة سنتها المالية ميلادية، وعاؤها الزكوي ٤٠٠٠٠٠ ريال. احسب الزكاة بالنسبة المعتمدة للسنة الميلادية.',
+      hint:'النسبة للسنة الميلادية ٢٫٥٧٧٪ مراعاةً لفرق الأيام.',
+      ans:10308, tol:5,
+      sol:['السنة الميلادية أطول من الهجرية، فالنسبة ٢٫٥٧٧٪.','الزكاة = ٤٠٠٠٠٠ × ٢٫٥٧٧٪ ≈ <b>١٠٣٠٨ ريالات</b>.']
+    }
+  ];
+
+  const BOARD_DATA = [
+    {cat:'التعريف والخصائص', qs:[
+      {p:100, q:'عرّف الزكاة شرعاً.', a:'نصيب مقدّر شرعاً، في مالٍ معين، لأصناف مخصوصة، على وجه مخصوص.'},
+      {p:200, q:'اذكر ثلاثة من معاني الزكاة في اللغة مع الشاهد.', a:'الطهارة «قد أفلح من زكّاها»، والمدح «فلا تزكّوا أنفسكم»، والنماء والزيادة، والصلاح.'},
+      {p:300, q:'ما المقصود بأن الزكاة «نوعية»؟ وما المقصود بأن سعرها «نسبي»؟', a:'نوعية: تُفرض على كل نوع من المال بمقدار يخصه فيختلف المُخرج باختلاف نوع المال. ونسبي: تبقى النسبة ثابتة مهما زادت قيمة الوعاء أو نقصت، وليست تصاعدية.'},
+      {p:400, q:'خاصيتان تميّزان الزكاة في التعلّق والازدواج — اذكرهما.', a:'الزكاة تجب في عين المال ولها تعلّق بالذمة فلا يسقطها تلف المال بعد الوجوب؛ ولا ازدواج فيها فلا تؤخذ مرتين في العام ولا تُفرض زكاتان على مالٍ واحد في سنة.'}
+    ]},
+    {cat:'الشروط والمصارف', qs:[
+      {p:100, q:'ما الشروط الواجب توافرها في المكلَّف؟', a:'الإسلام، والملك التام، والنية (وينوي عن الصغير والمجنون وليّهما).'},
+      {p:200, q:'كم مدة الحول؟ وما الأموال التي لا يُشترط لها؟', a:'سنة قمرية = ٣٥٤ يوماً. ولا يشترط الحول في الزروع والثمار والمعادن والركاز.'},
+      {p:300, q:'ما الفرق بين الفقير والمسكين؟', a:'الفقير: من لا يجد الكفاية مطلقاً أو يجد دون نصفها. والمسكين: من يجد أكثر الكفاية أو نصفها ولا يكفيه. ويُعطى كلٌّ منهما كفايته وكفاية من يعول سنة.'},
+      {p:400, q:'عدّد مصارف الزكاة الثمانية بالترتيب القرآني.', a:'الفقراء، المساكين، العاملون عليها، المؤلفة قلوبهم، وفي الرقاب، الغارمون، وفي سبيل الله، وابن السبيل. (التوبة: ٦٠)'}
+    ]},
+    {cat:'الأوعية والنِّسب', qs:[
+      {p:100, q:'ما نصاب الذهب والفضة؟ وما نسبة الزكاة فيهما؟', a:'الذهب ٨٥ غراماً عيار ٢٤، والفضة ٥٩٥ غراماً، والنسبة ربع العشر ٢٫٥٪.'},
+      {p:200, q:'متى تجب الزكاة في الحُليّ ومتى لا تجب؟', a:'لا تجب في المباح المعدّ للاستعمال أو العارية. وتجب إن كان للتجارة أو للتأجير أو للادخار أو فراراً من الزكاة، وكذلك الحلي المحرّم كأواني الذهب والفضة.'},
+      {p:300, q:'ما نصاب الزروع والثمار؟ وما النسبة في السقي بكلفة وبغير كلفة؟', a:'النصاب خمسة أوسق = ٣٠٠ صاع = ٦١٢ كجم. وبلا كلفة العشر ١٠٪، وبكلفة نصف العشر ٥٪.'},
+      {p:400, q:'قارن بين زكاة المعادن وزكاة الركاز في: النسبة، والنصاب، والحول، والمصرف.', a:'المعادن: ٢٫٥٪، يُشترط بلوغ نصاب الذهب أو الفضة أيهما أقل، ولا يُشترط الحول، ومصرفها الأصناف الثمانية. الركاز: ٢٠٪، لا نصاب له ولا حول، ويُصرف في مصالح المسلمين.'}
+    ]}
+  ];
+
+  const GAMES = [
+    {id:'rates',    icon:'⚖️', name:'سباق النِّسب',     desc:'٦٠ ثانية: يظهر لك نوع المال، فتختار نسبته: ٢٫٥٪ أم ٥٪ أم ١٠٪ أم ٢٠٪ أم لا زكاة.', meta:'فردي · مؤقّت'},
+    {id:'classify', icon:'🗂️', name:'صنّف الوعاء',      desc:'ضع كل مال في وعائه الزكوي الصحيح من بين ستة أوعية.', meta:'فردي · بلا مؤقّت'},
+    {id:'tf',       icon:'⚡', name:'تجب أم لا تجب؟',   desc:'٦٠ ثانية من الحالات السريعة: هل تجب فيها الزكاة أم لا؟ اختبار للشروط.', meta:'فردي · مؤقّت'},
+    {id:'match',    icon:'🧩', name:'المصارف الثمانية', desc:'طابِق كل مصرف من مصارف الزكاة بتعريفه الصحيح في أقصر وقت.', meta:'فردي · تحدّي وقت'},
+    {id:'calc',     icon:'🧮', name:'حاسبة التحدّي',    desc:'مسائل عملية: احسب الوعاء ثم مقدار الزكاة، مع تلميح وحلٍّ مفصّل.', meta:'فردي · تطبيقي'},
+    {id:'board',    icon:'🏆', name:'مسابقة الفرق',     desc:'لوحة نقاط ١٠٠–٤٠٠ في ثلاثة محاور، يديرها المدرّب على الشاشة بين فريقين إلى أربعة.', meta:'قاعة · جماعي'}
+  ];
+
+  /* ---------------- أدوات ---------------- */
+  const esc = s => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const AR = {'0':'٠','1':'١','2':'٢','3':'٣','4':'٤','5':'٥','6':'٦','7':'٧','8':'٨','9':'٩'};
+  const ar = n => String(n).replace(/[0-9]/g, d => AR[d]);
+  const shuffle = a => { a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+
+  /* ---------------- التنسيقات ---------------- */
+  const CSS = `
+  :host{ all:initial; }
+  *{ box-sizing:border-box; font-family:'Tajawal', ui-sans-serif, system-ui, sans-serif; }
+  .wrap{ direction:rtl; }
+  button{ font-family:inherit; }
+
+  .launcher{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    pointer-events:auto; z-index:2; display:none;
+    background:linear-gradient(135deg,#F59E0B,#D97706); color:#fff; border:none;
+    border-radius:999px; padding:12px 22px; font-size:15px; font-weight:700; cursor:pointer;
+    box-shadow:0 10px 24px rgba(15,118,110,.35); display:flex; align-items:center; gap:8px;
+    transition:transform .15s, box-shadow .15s;
+  }
+  .launcher:hover{ transform:translateX(-50%) translateY(-2px); box-shadow:0 14px 30px rgba(15,118,110,.45); }
+
+  .overlay{
+    position:fixed; inset:0; pointer-events:auto; background:rgba(15,23,42,.6);
+    display:flex; align-items:center; justify-content:center; padding:16px; overflow:auto;
+  }
+  .sheet{
+    background:#fff; color:#1F2937; width:100%; max-width:960px; max-height:92vh; overflow-y:auto;
+    border-radius:18px; box-shadow:0 24px 60px rgba(0,0,0,.3); padding:0;
+  }
+  .sheet-head{
+    position:sticky; top:0; background:#fff; z-index:3; display:flex; justify-content:space-between;
+    align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid #E5E7EB; border-radius:18px 18px 0 0;
+  }
+  .sheet-head h2{ margin:0; font-size:18px; font-weight:700; color:#0F766E; }
+  .sheet-head .sub{ font-size:12px; color:#6B7280; font-weight:400; display:block; margin-top:2px; }
+  .icon-btn{
+    background:#F3F4F6; border:none; border-radius:10px; width:34px; height:34px; cursor:pointer;
+    font-size:15px; color:#374151; flex-shrink:0;
+  }
+  .icon-btn:hover{ background:#E5E7EB; }
+  .sheet-body{ padding:20px; }
+
+  .note{ font-size:13px; color:#6B7280; line-height:1.9; margin:0 0 16px; }
+
+  .hub{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
+  .card{
+    background:#fff; border:1px solid #E5E7EB; border-radius:14px; padding:18px; cursor:pointer;
+    text-align:right; display:flex; flex-direction:column; gap:6px; min-height:158px;
+    transition:.15s; box-shadow:0 1px 2px rgba(0,0,0,.04);
+  }
+  .card:hover{ border-color:#0F766E; box-shadow:0 8px 20px rgba(15,118,110,.12); transform:translateY(-2px); }
+  .card .ic{ font-size:24px; line-height:1; }
+  .card h4{ margin:2px 0 0; font-size:17px; color:#0F766E; font-weight:700; }
+  .card p{ margin:0; font-size:13px; color:#6B7280; line-height:1.75; flex:1; }
+  .card .meta{ font-size:11.5px; color:#15803D; font-weight:500; }
+
+  .bar{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+        margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid #E5E7EB; }
+  .bar h3{ margin:0; font-size:18px; color:#0F766E; font-weight:700; }
+  .chips{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .chip{ border:1px solid #E5E7EB; background:#F9FAFB; border-radius:999px; padding:5px 13px; font-size:12.5px; color:#6B7280; }
+  .chip b{ color:#0F766E; font-size:14px; }
+  .chip.warn{ border-color:#FCA5A5; color:#DC2626; background:#FEF2F2; }
+  .chip.warn b{ color:#DC2626; }
+
+  .stage{ background:#F9FAFB; border:1px solid #E5E7EB; border-radius:14px; padding:22px; }
+  .prompt{ font-size:17px; line-height:1.95; margin-bottom:18px; color:#1F2937; }
+  .prompt .tag{ display:block; font-size:11.5px; color:#15803D; letter-spacing:.04em; margin-bottom:8px; font-weight:500; }
+
+  .choices{ display:flex; flex-wrap:wrap; gap:10px; }
+  .choice{
+    background:#fff; border:1px solid #D1D5DB; color:#1F2937; padding:12px 18px; border-radius:10px;
+    cursor:pointer; font-size:14.5px; flex:1 1 150px; text-align:center; transition:.12s;
+  }
+  .choice:hover:not(.disabled){ border-color:#0F766E; background:#F0FDFA; }
+  .choice.correct{ border-color:#15803D; background:#DCFCE7; color:#14532D; }
+  .choice.wrong{ border-color:#DC2626; background:#FEE2E2; color:#7F1D1D; }
+  .choice.disabled{ cursor:default; }
+  .choice.big{ flex:1 1 40%; padding:20px; font-size:17px; font-weight:700; }
+
+  .fb{ margin-top:16px; padding:13px 15px; border-radius:10px; font-size:13.5px; line-height:1.9;
+       border-right:4px solid #0F766E; background:#fff; color:#4B5563; display:none; }
+  .fb.show{ display:block; }
+  .fb.ok{ border-right-color:#15803D; background:#F0FDF4; }
+  .fb.no{ border-right-color:#DC2626; background:#FEF2F2; }
+  .fb b{ color:#111827; }
+
+  .actions{ margin-top:16px; display:flex; gap:10px; justify-content:space-between; align-items:center; flex-wrap:wrap; }
+  .btn{ background:#0F766E; color:#fff; border:none; border-radius:10px; padding:11px 20px;
+        font-weight:700; font-size:14px; cursor:pointer; }
+  .btn:hover{ background:#115E59; }
+  .btn.ghost{ background:#fff; color:#374151; border:1px solid #D1D5DB; }
+  .btn.ghost:hover{ background:#F3F4F6; }
+  .btn.sm{ padding:8px 14px; font-size:13px; }
+
+  .num{ background:#fff; border:1px solid #D1D5DB; color:#1F2937; padding:11px 14px; border-radius:10px;
+        font-size:16px; width:190px; text-align:center; }
+  .num:focus{ outline:none; border-color:#0F766E; }
+
+  .tbar{ height:6px; background:#E5E7EB; border-radius:4px; overflow:hidden; margin-bottom:14px; }
+  .tfill{ height:100%; background:#0F766E; transition:width .9s linear; }
+  .tfill.low{ background:#DC2626; }
+
+  .mgrid{ display:grid; grid-template-columns:1fr 1.4fr; gap:12px; }
+  @media(max-width:640px){ .mgrid{ grid-template-columns:1fr; } .sheet{ max-height:96vh; } }
+  .mcol{ display:flex; flex-direction:column; gap:8px; }
+  .mitem{ background:#fff; border:1px solid #D1D5DB; color:#1F2937; padding:11px 13px; border-radius:10px;
+          cursor:pointer; font-size:13.5px; text-align:right; line-height:1.75; transition:.12s; }
+  .mitem:hover{ border-color:#0F766E; }
+  .mitem.sel{ border-color:#0F766E; background:#F0FDFA; box-shadow:0 0 0 2px rgba(15,118,110,.15); }
+  .mitem.done{ border-color:#86EFAC; background:#F0FDF4; color:#9CA3AF; cursor:default; }
+  .mitem.shake{ animation:sh .35s; border-color:#DC2626; }
+  @keyframes sh{ 25%{transform:translateX(6px)} 50%{transform:translateX(-6px)} 75%{transform:translateX(4px)} }
+
+  .teams{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+  .team{ background:#fff; border:1px solid #E5E7EB; border-radius:12px; padding:10px 14px;
+         min-width:130px; flex:1 1 130px; text-align:center; }
+  .team.lead{ border-color:#0F766E; background:#F0FDFA; }
+  .team input{ width:100%; background:none; border:none; border-bottom:1px dashed #D1D5DB; color:#374151;
+               font-size:13px; text-align:center; padding:2px; }
+  .team input:focus{ outline:none; border-bottom-color:#0F766E; }
+  .team .sc{ font-size:26px; font-weight:700; color:#0F766E; margin-top:4px; }
+
+  .board{ display:grid; gap:8px; }
+  .bcat{ font-size:14.5px; color:#0F766E; text-align:center; padding:9px 4px; font-weight:700;
+         border-bottom:2px solid #CCFBF1; }
+  .cell{ background:#fff; border:1px solid #D1D5DB; color:#0F766E; font-size:20px; font-weight:700;
+         padding:18px 6px; border-radius:10px; cursor:pointer; transition:.12s; }
+  .cell:hover:not(.used){ background:#F0FDFA; border-color:#0F766E; }
+  .cell.used{ opacity:.3; cursor:default; color:#9CA3AF; }
+
+  .sol{ font-size:13.5px; line-height:2; color:#1F2937; }
+  .sol ul{ margin:6px 0; padding-right:18px; }
+  .result{ text-align:center; padding:26px 10px; }
+  .result .big{ font-size:46px; font-weight:700; color:#0F766E; }
+  .result h3{ margin:6px 0; font-size:20px; color:#1F2937; }
+  .result p{ color:#6B7280; font-size:13.5px; }
+  `;
+
+  /* ---------------- بناء الطبقة ---------------- */
+  const host = document.createElement('div');
+  host.id = 'zakat-games-host';
+  host.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483000;';
+  document.body.appendChild(host);
+  const R = host.attachShadow({mode:'open'});
+  R.innerHTML = `<style>${CSS}</style>
+    <div class="wrap">
+      <button class="launcher" id="launch">🏆 مسابقات الوحدة الأولى</button>
+      <div class="overlay" id="overlay" style="display:none;">
+        <div class="sheet" id="sheet">
+          <div class="sheet-head">
+            <div>
+              <h2>🏆 مسابقات الوحدة الأولى — الزكاة</h2>
+              <span class="sub">ست مسابقات وألعاب مبنية على محتوى الوحدة · تعمل بدون إنترنت</span>
+            </div>
+            <button class="icon-btn" id="close" title="إغلاق">✕</button>
+          </div>
+          <div class="sheet-body" id="panel"></div>
+        </div>
+      </div>
+    </div>`;
+
+  const $ = sel => R.querySelector(sel);
+  const panel = $('#panel');
+  const overlay = $('#overlay');
+  const launcher = $('#launch');
+
+  let gs = null;
+  const stopTimer = () => { if(gs && gs.timer){ clearInterval(gs.timer); gs.timer = null; } };
+
+  function openGames(){ overlay.style.display = 'flex'; render(); }
+  function close(){ stopTimer(); gs = null; overlay.style.display = 'none'; }
+  launcher.addEventListener('click', openGames);
+  $('#close').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && overlay.style.display !== 'none') close(); });
+
+  // إخفاء الزر العائم أثناء وضع العرض التقديمي بملء الشاشة
+  document.addEventListener('fullscreenchange', () => {
+    const fs = !!document.fullscreenElement;
+    const inside = document.fullscreenElement && document.fullscreenElement.id === 'zakat-games-host';
+    if(fs && !inside) launcher.style.display = 'none'; else syncLauncher();
+  });
+
+  /* -------- زر «مسابقات الوحدة الأولى» داخل صندوق الوحدة الأولى -------- */
+  const ENTRY_LABEL = '🏆 مسابقات الوحدة الأولى';
+
+  function styleEntry(btn, compact){
+    btn.style.cssText = `
+      display:flex; align-items:center; justify-content:center; gap:6px; width:100%;
+      box-sizing:border-box; cursor:pointer; border:none; border-radius:${compact?'8px':'10px'};
+      background:linear-gradient(135deg,#F59E0B,#D97706); color:#fff;
+      font-family:'Tajawal', ui-sans-serif, system-ui, sans-serif; font-weight:700;
+      font-size:${compact?'12px':'13px'}; padding:${compact?'8px 10px':'10px 12px'};
+      margin-top:${compact?'6px':'8px'}; text-align:center; line-height:1.6;
+      box-shadow:0 3px 10px rgba(217,119,6,.35); transition:filter .15s, transform .15s;
+    `;
+    btn.onmouseenter = () => { btn.style.filter = 'brightness(1.07)'; btn.style.transform = 'translateY(-1px)'; };
+    btn.onmouseleave = () => { btn.style.filter = ''; btn.style.transform = ''; };
+  }
+
+  function injectEntries(){
+    let placed = 0;
+    document.querySelectorAll('a[href="#/chapter/u1-c4"]').forEach(a => {
+      const li = a.closest('li');
+      const box = li ? li.parentElement : a.parentElement;
+      if(!box) return;
+      const existing = box.querySelector(':scope > [data-zg-entry]');
+      if(existing){ placed++; return; }
+      const compact = (box.className || '').indexOf('space-y-0.5') !== -1;
+      const holder = document.createElement(li ? 'li' : 'div');
+      holder.setAttribute('data-zg-entry','1');
+      holder.style.listStyle = 'none';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = ENTRY_LABEL;
+      styleEntry(btn, compact);
+      btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openGames(); });
+      holder.appendChild(btn);
+      const ref = li || a;
+      (ref.parentElement || box).insertBefore(holder, ref.nextSibling);
+      placed++;
+    });
+    return placed;
+  }
+
+  function syncLauncher(){
+    // الزر العائم احتياطي: يظهر فقط إن تعذّر وضع الزر داخل صندوق الوحدة
+    let n = 0;
+    try { n = injectEntries(); } catch(e){ n = 0; }
+    launcher.style.display = n > 0 ? 'none' : 'flex';
+  }
+
+  syncLauncher();
+  window.addEventListener('hashchange', () => setTimeout(syncLauncher, 250));
+  let scheduled = false;
+  try{
+    new MutationObserver(() => {
+      if(scheduled) return;
+      scheduled = true;
+      setTimeout(() => { scheduled = false; syncLauncher(); }, 300);
+    }).observe(document.body, {childList:true, subtree:true});
+  }catch(e){}
+  setInterval(syncLauncher, 2000);
+
+  /* ---------------- التوجيه ---------------- */
+  function render(){
+    if(!gs){
+      panel.innerHTML = `
+        <p class="note">الخمس الألعاب الأولى للمذاكرة الفردية، والأخيرة لإدارة مسابقة بين فرق داخل القاعة. جميع الأسئلة والتعليلات مأخوذة من نص الوحدة الأولى.</p>
+        <div class="hub">
+          ${GAMES.map(g => `
+            <button class="card" data-game="${g.id}">
+              <span class="ic">${g.icon}</span>
+              <h4>${g.name}</h4>
+              <p>${g.desc}</p>
+              <span class="meta">${g.meta}</span>
+            </button>`).join('')}
+        </div>`;
+      panel.querySelectorAll('.card').forEach(b => b.addEventListener('click', () => start(b.dataset.game)));
+      return;
+    }
+    ({rates:renderRates, classify:renderClassify, tf:renderTF, match:renderMatch, calc:renderCalc, board:renderBoard})[gs.id]();
+  }
+
+  function start(id){
+    stopTimer();
+    if(id === 'rates')    gs = {id, items:shuffle(RATE_ITEMS), i:0, score:0, streak:0, best:0, left:60, picked:null, timer:null};
+    if(id === 'classify') gs = {id, items:shuffle(CLASSIFY_ITEMS), i:0, score:0, picked:null};
+    if(id === 'tf')       gs = {id, items:shuffle(TF_ITEMS), i:0, score:0, streak:0, best:0, left:60, picked:null, timer:null};
+    if(id === 'match')    gs = {id, left:shuffle(MASARIF), right:shuffle(MASARIF), sel:null, done:[], tries:0, secs:0, timer:null};
+    if(id === 'calc')     gs = {id, items:shuffle(CALC_PROBLEMS), i:0, score:0, shown:false, hinted:false, tried:false, msg:null};
+    if(id === 'board')    gs = {id, phase:'setup', teams:[], used:{}, cur:null, revealed:false, left:30, timer:null};
+    render();
+    if(id === 'rates' || id === 'tf') countdown(60);
+    if(id === 'match') countup();
+  }
+  function exit(){ stopTimer(); gs = null; render(); }
+
+  function bar(title, chips){
+    return `<div class="bar">
+      <h3>${title}</h3>
+      <div class="chips">
+        ${chips.map(c => `<span class="chip ${c.warn?'warn':''}">${c.l} <b>${c.v}</b></span>`).join('')}
+        <button class="btn ghost sm" id="exit">كل الألعاب</button>
+      </div>
+    </div>`;
+  }
+  function bindExit(){ const b = $('#exit'); if(b) b.addEventListener('click', exit); }
+
+  function countdown(total){
+    stopTimer();
+    gs.timer = setInterval(() => {
+      if(!gs){ stopTimer(); return; }
+      gs.left--;
+      const f = $('#fill'), c = $('#clock');
+      if(f){ f.style.width = Math.max(gs.left,0)/total*100+'%'; f.classList.toggle('low', gs.left <= 10); }
+      if(c) c.textContent = ar(Math.max(gs.left,0));
+      if(gs.left <= 0){ stopTimer(); gs.over = true; render(); }
+    }, 1000);
+  }
+  function countup(){
+    stopTimer();
+    gs.timer = setInterval(() => {
+      if(!gs){ stopTimer(); return; }
+      gs.secs++;
+      const c = $('#clock'); if(c) c.textContent = ar(gs.secs);
+    }, 1000);
+  }
+
+  function result(title, big, sub, again){
+    stopTimer();
+    const id = gs.id;
+    panel.innerHTML = `${bar(title, [])}
+      <div class="stage">
+        <div class="result">
+          <div class="big">${big}</div>
+          <h3>${sub}</h3>
+          <p>راجع الفصل المتعلق بالنقاط التي أخطأت فيها ثم أعد المحاولة.</p>
+          <div style="margin-top:18px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+            <button class="btn" id="again">${again}</button>
+            <button class="btn ghost" id="hub">كل الألعاب</button>
+          </div>
+        </div>
+      </div>`;
+    bindExit();
+    $('#again').addEventListener('click', () => start(id));
+    $('#hub').addEventListener('click', exit);
+  }
+
+  /* ---------------- ١ سباق النِّسب ---------------- */
+  function renderRates(){
+    if(gs.over || gs.i >= gs.items.length)
+      return result('سباق النِّسب', ar(gs.score), `أصبتَ ${ar(gs.score)} إجابة · أطول سلسلة ${ar(gs.best)}`, 'جولة جديدة');
+    const it = gs.items[gs.i];
+    panel.innerHTML = `
+      ${bar('سباق النِّسب', [{l:'النقاط',v:ar(gs.score)},{l:'السلسلة',v:ar(gs.streak)},{l:'ثانية',v:`<span id="clock">${ar(gs.left)}</span>`,warn:gs.left<=10}])}
+      <div class="tbar"><div class="tfill ${gs.left<=10?'low':''}" id="fill" style="width:${gs.left/60*100}%"></div></div>
+      <div class="stage">
+        <div class="prompt"><span class="tag">ما نسبة الزكاة الواجبة في:</span>${esc(it.t)}</div>
+        <div class="choices">${RATE_OPTIONS.map((o,i) => `<button class="choice" data-i="${i}">${o}</button>`).join('')}</div>
+        <div class="fb" id="fb"></div>
+        <div class="actions"><span></span><button class="btn" id="next" style="display:none;">التالي</button></div>
+      </div>`;
+    bindExit();
+    panel.querySelectorAll('.choice').forEach(btn => btn.addEventListener('click', () => {
+      if(gs.picked !== null) return;
+      const c = +btn.dataset.i; gs.picked = c;
+      const ok = c === it.a;
+      if(ok){ gs.score++; gs.streak++; gs.best = Math.max(gs.best, gs.streak); } else gs.streak = 0;
+      panel.querySelectorAll('.choice').forEach(b => {
+        b.classList.add('disabled');
+        if(+b.dataset.i === it.a) b.classList.add('correct');
+        else if(+b.dataset.i === c) b.classList.add('wrong');
+      });
+      const fb = $('#fb');
+      fb.className = 'fb show ' + (ok?'ok':'no');
+      fb.innerHTML = `<b>${ok?'إجابة صحيحة.':'الصواب: '+RATE_OPTIONS[it.a]+'.'}</b> ${esc(it.w)}`;
+      $('#next').style.display = 'inline-block';
+    }));
+    $('#next').addEventListener('click', () => { gs.i++; gs.picked = null; render(); });
+  }
+
+  /* ---------------- ٢ صنّف الوعاء ---------------- */
+  function renderClassify(){
+    if(gs.i >= gs.items.length){
+      const pct = Math.round(gs.score/gs.items.length*100);
+      return result('صنّف الوعاء', ar(pct)+'٪', `أصبتَ ${ar(gs.score)} من ${ar(gs.items.length)}`, 'إعادة اللعبة');
+    }
+    const it = gs.items[gs.i];
+    panel.innerHTML = `
+      ${bar('صنّف الوعاء', [{l:'صحيحة',v:ar(gs.score)},{l:'البطاقة',v:ar(gs.i+1)+' / '+ar(gs.items.length)}])}
+      <div class="stage">
+        <div class="prompt"><span class="tag">في أي وعاء زكوي يدخل هذا المال؟</span>${esc(it.t)}</div>
+        <div class="choices">${BUCKETS.map((b,i) => `<button class="choice" data-i="${i}">${b}</button>`).join('')}</div>
+        <div class="fb" id="fb"></div>
+        <div class="actions"><span></span><button class="btn" id="next" style="display:none;">البطاقة التالية</button></div>
+      </div>`;
+    bindExit();
+    panel.querySelectorAll('.choice').forEach(btn => btn.addEventListener('click', () => {
+      if(gs.picked !== null) return;
+      const c = +btn.dataset.i; gs.picked = c;
+      const ok = c === it.a; if(ok) gs.score++;
+      panel.querySelectorAll('.choice').forEach(b => {
+        b.classList.add('disabled');
+        if(+b.dataset.i === it.a) b.classList.add('correct');
+        else if(+b.dataset.i === c) b.classList.add('wrong');
+      });
+      const fb = $('#fb');
+      fb.className = 'fb show ' + (ok?'ok':'no');
+      fb.innerHTML = `<b>${ok?'أحسنت.':'الصواب: '+BUCKETS[it.a]+'.'}</b> ${esc(it.w)}`;
+      $('#next').style.display = 'inline-block';
+    }));
+    $('#next').addEventListener('click', () => { gs.i++; gs.picked = null; render(); });
+  }
+
+  /* ---------------- ٣ تجب أم لا تجب ---------------- */
+  function renderTF(){
+    if(gs.over || gs.i >= gs.items.length)
+      return result('تجب أم لا تجب؟', ar(gs.score), `أصبتَ ${ar(gs.score)} حالة · أطول سلسلة ${ar(gs.best)}`, 'جولة جديدة');
+    const it = gs.items[gs.i];
+    panel.innerHTML = `
+      ${bar('تجب أم لا تجب؟', [{l:'النقاط',v:ar(gs.score)},{l:'السلسلة',v:ar(gs.streak)},{l:'ثانية',v:`<span id="clock">${ar(gs.left)}</span>`,warn:gs.left<=10}])}
+      <div class="tbar"><div class="tfill ${gs.left<=10?'low':''}" id="fill" style="width:${gs.left/60*100}%"></div></div>
+      <div class="stage">
+        <div class="prompt"><span class="tag">هل تجب الزكاة في هذه الحالة؟</span>${esc(it.t)}</div>
+        <div class="choices">
+          <button class="choice big" data-v="1">تجب</button>
+          <button class="choice big" data-v="0">لا تجب</button>
+        </div>
+        <div class="fb" id="fb"></div>
+        <div class="actions"><span></span><button class="btn" id="next" style="display:none;">التالية</button></div>
+      </div>`;
+    bindExit();
+    panel.querySelectorAll('.choice').forEach(btn => btn.addEventListener('click', () => {
+      if(gs.picked !== null) return;
+      const v = btn.dataset.v === '1'; gs.picked = v;
+      const ok = v === it.a;
+      if(ok){ gs.score++; gs.streak++; gs.best = Math.max(gs.best, gs.streak); } else gs.streak = 0;
+      panel.querySelectorAll('.choice').forEach(b => {
+        b.classList.add('disabled');
+        const bv = b.dataset.v === '1';
+        if(bv === it.a) b.classList.add('correct');
+        else if(bv === v) b.classList.add('wrong');
+      });
+      const fb = $('#fb');
+      fb.className = 'fb show ' + (ok?'ok':'no');
+      fb.innerHTML = `<b>${ok?'صحيح.':'الصواب: '+(it.a?'تجب.':'لا تجب.')}</b> ${esc(it.w)}`;
+      $('#next').style.display = 'inline-block';
+    }));
+    $('#next').addEventListener('click', () => { gs.i++; gs.picked = null; render(); });
+  }
+
+  /* ---------------- ٤ المصارف الثمانية ---------------- */
+  function renderMatch(){
+    if(gs.done.length === MASARIF.length)
+      return result('المصارف الثمانية', ar(gs.secs)+'ث', `أتممت المطابقة في ${ar(gs.secs)} ثانية بـ ${ar(gs.tries)} محاولة`, 'إعادة اللعبة');
+    panel.innerHTML = `
+      ${bar('المصارف الثمانية', [{l:'مطابَق',v:ar(gs.done.length)+' / ٨'},{l:'محاولات',v:ar(gs.tries)},{l:'ثانية',v:`<span id="clock">${ar(gs.secs)}</span>`}])}
+      <div class="stage">
+        <p class="note" style="margin:0 0 14px;">اختر مصرفاً من العمود الأيمن ثم تعريفه من العمود الأيسر.</p>
+        <div class="mgrid">
+          <div class="mcol">
+            ${gs.left.map(m => `<button class="mitem ${gs.done.includes(m.k)?'done':''} ${gs.sel===m.k?'sel':''}" data-side="k" data-k="${m.k}">${m.k}</button>`).join('')}
+          </div>
+          <div class="mcol">
+            ${gs.right.map(m => `<button class="mitem ${gs.done.includes(m.k)?'done':''}" data-side="v" data-k="${m.k}">${m.v}</button>`).join('')}
+          </div>
+        </div>
+      </div>`;
+    bindExit();
+    panel.querySelectorAll('.mitem').forEach(btn => btn.addEventListener('click', () => {
+      const k = btn.dataset.k;
+      if(gs.done.includes(k)) return;
+      if(btn.dataset.side === 'k'){ gs.sel = (gs.sel === k ? null : k); render(); return; }
+      if(!gs.sel) return;
+      gs.tries++;
+      if(gs.sel === k){ gs.done.push(k); gs.sel = null; render(); }
+      else { btn.classList.add('shake'); setTimeout(() => { gs.sel = null; render(); }, 380); }
+    }));
+  }
+
+  /* ---------------- ٥ حاسبة التحدّي ---------------- */
+  function renderCalc(){
+    if(gs.i >= gs.items.length)
+      return result('حاسبة التحدّي', ar(gs.score)+' / '+ar(gs.items.length),
+        `حللت ${ar(gs.score)} مسألة من ${ar(gs.items.length)} من أول محاولة`, 'مسائل جديدة');
+    const p = gs.items[gs.i];
+    panel.innerHTML = `
+      ${bar('حاسبة التحدّي', [{l:'صحيحة',v:ar(gs.score)},{l:'المسألة',v:ar(gs.i+1)+' / '+ar(gs.items.length)}])}
+      <div class="stage">
+        <div class="prompt"><span class="tag">احسب مقدار الزكاة</span>${esc(p.t)}</div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <input class="num" id="ans" type="number" step="any" placeholder="المبلغ بالريال" ${gs.shown?'disabled':''}>
+          <button class="btn" id="check" ${gs.shown?'disabled':''}>تحقّق</button>
+          <button class="btn ghost sm" id="hint">تلميح</button>
+          <button class="btn ghost sm" id="show">أظهر الحل</button>
+        </div>
+        <div class="fb ${gs.msg?'show '+gs.msg.cls:''}" id="fb">${gs.msg?gs.msg.html:''}</div>
+        ${gs.hinted && !gs.shown ? `<div class="fb show">💡 ${esc(p.hint)}</div>` : ''}
+        ${gs.shown ? `<div class="fb show ok"><div class="sol"><b>الحل:</b><ul>${p.sol.map(s=>`<li>${s}</li>`).join('')}</ul></div></div>` : ''}
+        <div class="actions"><span></span><button class="btn" id="next" style="${gs.shown?'':'display:none;'}">المسألة التالية</button></div>
+      </div>`;
+    bindExit();
+    const input = $('#ans'), fb = $('#fb');
+    function check(){
+      const v = parseFloat(input.value);
+      if(isNaN(v)){ fb.className = 'fb show no'; fb.innerHTML = 'أدخل رقماً أولاً.'; return; }
+      if(Math.abs(v - p.ans) <= (p.tol || 0.5)){
+        if(!gs.tried) gs.score++;
+        gs.shown = true;
+        gs.msg = {cls:'ok', html:'<b>إجابة صحيحة.</b> تحقّق من خطوات الحل بالأسفل.'};
+        render();
+      } else {
+        gs.tried = true;
+        fb.className = 'fb show no';
+        fb.innerHTML = '<b>غير صحيح.</b> راجع تحديد الوعاء (ما يدخل وما يُستبعد) ثم النسبة المناسبة، أو اطلب تلميحاً.';
+      }
+    }
+    $('#check').addEventListener('click', check);
+    input.addEventListener('keydown', e => { if(e.key === 'Enter') check(); });
+    $('#hint').addEventListener('click', () => { gs.hinted = true; render(); });
+    $('#show').addEventListener('click', () => { gs.shown = true; gs.msg = null; render(); });
+    $('#next').addEventListener('click', () => { gs.i++; gs.shown = false; gs.hinted = false; gs.tried = false; gs.msg = null; render(); });
+  }
+
+  /* ---------------- ٦ مسابقة الفرق ---------------- */
+  function renderBoard(){
+    if(gs.phase === 'setup'){
+      panel.innerHTML = `${bar('مسابقة الفرق', [])}
+        <div class="stage">
+          <p class="note" style="margin:0 0 14px;">وضع القاعة: اعرض الشاشة على المتدربين، قسّمهم إلى فرق، ثم اختر خانة من اللوحة. لكل سؤال ٣٠ ثانية، وأنت من يمنح النقاط للفريق المجيب.</p>
+          <div style="font-weight:700; margin-bottom:10px;">عدد الفرق:</div>
+          <div class="choices">${[2,3,4].map(n => `<button class="choice" data-n="${n}">${ar(n)} فرق</button>`).join('')}</div>
+        </div>`;
+      bindExit();
+      panel.querySelectorAll('.choice').forEach(b => b.addEventListener('click', () => {
+        const n = +b.dataset.n;
+        const names = ['الفريق الأول','الفريق الثاني','الفريق الثالث','الفريق الرابع'];
+        gs.teams = Array.from({length:n}, (_,i) => ({n:names[i], s:0}));
+        gs.phase = 'board'; render();
+      }));
+      return;
+    }
+
+    const total = BOARD_DATA.length * 4;
+    const used = Object.keys(gs.used).length;
+    const max = Math.max(...gs.teams.map(t => t.s));
+    const teamsHtml = `<div class="teams">${gs.teams.map((t,i) => `
+        <div class="team ${t.s === max && max > 0 ? 'lead':''}">
+          <input value="${esc(t.n)}" data-team="${i}">
+          <div class="sc">${ar(t.s)}</div>
+        </div>`).join('')}</div>`;
+
+    if(gs.phase === 'board'){
+      if(used === total){
+        const win = gs.teams.slice().sort((a,b) => b.s - a.s)[0];
+        return result('مسابقة الفرق', '🏆', `الفائز: ${win.n} برصيد ${ar(win.s)} نقطة`, 'مسابقة جديدة');
+      }
+      panel.innerHTML = `
+        ${bar('مسابقة الفرق', [{l:'الأسئلة',v:ar(used)+' / '+ar(total)}])}
+        ${teamsHtml}
+        <div class="board" style="grid-template-columns:repeat(${BOARD_DATA.length},1fr);">
+          ${BOARD_DATA.map(c => `<div class="bcat">${c.cat}</div>`).join('')}
+          ${[0,1,2,3].map(r => BOARD_DATA.map((c,ci) => {
+            const key = ci+'-'+r;
+            return `<button class="cell ${gs.used[key]?'used':''}" data-key="${key}">${ar(c.qs[r].p)}</button>`;
+          }).join('')).join('')}
+        </div>
+        <p class="note" style="margin-top:14px;">اضغط على قيمة النقاط لعرض السؤال. الخانات الباهتة استُخدمت.
+          <button class="btn ghost sm" id="full">⛶ ملء الشاشة</button></p>`;
+      bindExit(); bindNames();
+      $('#full').addEventListener('click', () => {
+        if(document.fullscreenElement) document.exitFullscreen();
+        else host.requestFullscreen().catch(()=>{});
+      });
+      panel.querySelectorAll('.cell:not(.used)').forEach(b => b.addEventListener('click', () => {
+        const [ci, r] = b.dataset.key.split('-').map(Number);
+        gs.cur = {ci, r, key:b.dataset.key};
+        gs.revealed = false; gs.left = 30; gs.phase = 'question';
+        render(); countdownQ();
+      }));
+      return;
+    }
+
+    const q = BOARD_DATA[gs.cur.ci].qs[gs.cur.r];
+    panel.innerHTML = `
+      ${bar(BOARD_DATA[gs.cur.ci].cat + ' — ' + ar(q.p) + ' نقطة', [{l:'ثانية',v:`<span id="clock">${ar(gs.left)}</span>`,warn:gs.left<=10}])}
+      ${teamsHtml}
+      <div class="tbar"><div class="tfill ${gs.left<=10?'low':''}" id="fill" style="width:${gs.left/30*100}%"></div></div>
+      <div class="stage">
+        <div class="prompt" style="font-size:20px;">${esc(q.q)}</div>
+        ${gs.revealed ? `<div class="fb show ok"><b>الإجابة:</b> ${esc(q.a)}</div>` : ''}
+        <div class="actions">
+          ${gs.revealed
+            ? `<div class="choices" style="flex:1;">
+                 ${gs.teams.map((t,i) => `<button class="choice" data-award="${i}">+${ar(q.p)} لـ ${esc(t.n)}</button>`).join('')}
+                 <button class="choice" data-award="-1">لا أحد</button>
+               </div>`
+            : `<button class="btn" id="reveal">أظهر الإجابة</button><button class="btn ghost sm" id="back">رجوع للوحة</button>`}
+        </div>
+      </div>`;
+    bindExit(); bindNames();
+    if(!gs.revealed){
+      $('#reveal').addEventListener('click', () => { stopTimer(); gs.revealed = true; render(); });
+      $('#back').addEventListener('click', () => { stopTimer(); gs.phase = 'board'; render(); });
+    } else {
+      panel.querySelectorAll('[data-award]').forEach(b => b.addEventListener('click', () => {
+        const i = +b.dataset.award;
+        if(i >= 0) gs.teams[i].s += q.p;
+        gs.used[gs.cur.key] = true; gs.phase = 'board'; gs.cur = null; render();
+      }));
+    }
+  }
+
+  function bindNames(){
+    panel.querySelectorAll('[data-team]').forEach(inp =>
+      inp.addEventListener('change', () => { gs.teams[+inp.dataset.team].n = inp.value || 'فريق'; }));
+  }
+
+  function countdownQ(){
+    stopTimer();
+    gs.timer = setInterval(() => {
+      if(!gs || gs.phase !== 'question'){ stopTimer(); return; }
+      gs.left--;
+      const f = $('#fill'), c = $('#clock');
+      if(f){ f.style.width = Math.max(gs.left,0)/30*100+'%'; f.classList.toggle('low', gs.left <= 10); }
+      if(c) c.textContent = ar(Math.max(gs.left,0));
+      if(gs.left <= 0){ stopTimer(); gs.revealed = true; render(); }
+    }, 1000);
+  }
+})();
+
+    </script>
   </body>
 </html>
